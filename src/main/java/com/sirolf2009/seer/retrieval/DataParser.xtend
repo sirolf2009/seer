@@ -20,26 +20,15 @@ import java.util.stream.Stream
 import com.sirolf2009.seer.model.Either
 
 class DataParser {
-	
-	def static void main(String[] args) {
-		new File("/home/floris/Documents/2018/0/1").parseFolder.filter[
-			orderbook.asks.get(0).amount.doubleValue > 100 || orderbook.bids.get(0).amount.doubleValue > 100  
-		].forEach[
-			println(timestamp)
-			println("Ask: "+orderbook.asks.get(0).amount.doubleValue)
-			println("Bid: "+orderbook.bids.get(0).amount.doubleValue)
-			println()
-		]
-	}
-	
+
 	def static List<ITick> loadFolder(File folder) {
 		folder.parseFolder.collect(Collectors.toList())
 	}
-	
+
 	def static Stream<ITick> parseFolder(File folder) {
-		loadFolderHelper(folder).sorted[a,b| a.timestamp.compareTo(b.timestamp)]
+		loadFolderHelper(folder).sorted[a, b|a.timestamp.compareTo(b.timestamp)]
 	}
-	
+
 	def static private Stream<ITick> loadFolderHelper(File file) {
 		if(file.directory) {
 			file.listFiles.parallelStream.flatMap[loadFolderHelper]
@@ -47,11 +36,11 @@ class DataParser {
 			return loadFile(file).stream()
 		}
 	}
-	
+
 	def static List<ITick> loadFile(File file) {
 		val trades = new ArrayList()
 		val ticks = new ArrayList()
-		file.parseFile.forEach[
+		file.parseFile.forEach [
 			consume([
 				ticks.add(new Tick(timestamp, it, new ArrayList(trades)))
 				trades.clear()
@@ -61,49 +50,71 @@ class DataParser {
 		]
 		return ticks
 	}
-	
+
 	def static Stream<Either<IOrderbook, ITrade>> parseFile(File file) {
-		return new BufferedReader(new FileReader(file)).lines.map[
+		return new BufferedReader(new FileReader(file)).lines.map [
 			val data = split(",")
-			return Either.cond(data.get(0) == "t", [parseOrderbook], [parseTrade])
+			return Either.cond(data.get(0) == "o", [parseOrderbook], [parseTrade])
 		]
 	}
-	
+
 	def static ITrade parseTrade(String trade) {
-		val data = trade.split(",")
-		val timestamp = data.get(1).asLong
-		val price = data.get(2).asDouble
-		val amount = data.get(3).asDouble
-		return new Trade(new Point(timestamp, price), amount)
+		try {
+			val data = trade.split(",")
+			val timestamp = data.get(1).asLong
+			val price = data.get(2).asDouble
+			val amount = data.get(3).asDouble
+			return new Trade(new Point(timestamp, price), amount)
+		} catch(Exception e) {
+			throw new ParseException("Failed to parse trade " + trade, e)
+		}
 	}
-	
+
 	def static IOrderbook parseOrderbook(String orderbook) {
-		val data = orderbook.split(",")
-		val timestamp = data.get(1).asDate
-		val asks = data.get(2).parseOrders
-		val bids = data.get(3).parseOrders
-		return new Orderbook(timestamp, asks, bids)
+		try {
+			val data = orderbook.split(",")
+			val timestamp = data.get(1).asDate
+			val asks = data.get(2).parseOrders
+			val bids = data.get(3).parseOrders
+			return new Orderbook(timestamp, asks, bids)
+		} catch(Exception e) {
+			throw new ParseException("Failed to parse orderbook " + orderbook, e)
+		}
 	}
-	
+
 	def static List<ILimitOrder> parseOrders(String orders) {
-		return orders.split(";").map[parseOrder].toList()
+		try {
+			return orders.split(";").map[parseOrder].toList()
+		} catch(Exception e) {
+			throw new ParseException("Failed to parse orders " + orders, e)
+		}
 	}
-	
+
 	def static ILimitOrder parseOrder(String order) {
-		val data = order.split(":")
-		return new LimitOrder(data.get(0).asDouble, data.get(1).asDouble)
+		try {
+			val data = order.split(":")
+			return new LimitOrder(data.get(0).asDouble, data.get(1).asDouble)
+		} catch(Exception e) {
+			throw new ParseException("Failed to parse order " + order, e)
+		}
 	}
-	
+
+	static class ParseException extends Exception {
+		new(String msg, Throwable e) {
+			super(msg, e)
+		}
+	}
+
 	def static asDouble(String string) {
 		return Double.parseDouble(string)
 	}
-	
+
 	def static asDate(String string) {
 		return new Date(string.asLong)
 	}
-	
+
 	def static asLong(String string) {
 		return Long.parseLong(string)
 	}
-	
+
 }
