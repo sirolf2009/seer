@@ -25,13 +25,9 @@ class DataParser {
 		folder.parseFolder.collect(Collectors.toList())
 	}
 
-	def static Stream<ITick> parseFolder(File folder) {
-		loadFolderHelper(folder).sorted[a, b|a.timestamp.compareTo(b.timestamp)]
-	}
-
-	def static private Stream<ITick> loadFolderHelper(File file) {
+	def static Stream<ITick> parseFolder(File file) {
 		if(file.directory) {
-			file.listFiles.parallelStream.flatMap[loadFolderHelper]
+			file.listFiles.sortBy[name].stream.flatMap[parseFolder]
 		} else {
 			return loadFile(file).stream()
 		}
@@ -52,7 +48,7 @@ class DataParser {
 	}
 
 	def static Stream<Either<IOrderbook, ITrade>> parseFile(File file) {
-		return new BufferedReader(new FileReader(file)).lines.map [
+		return new BufferedReader(new FileReader(file), 2621000).lines.map [
 			val data = split(",")
 			return Either.cond(data.get(0) == "o", [parseOrderbook], [parseTrade])
 		]
